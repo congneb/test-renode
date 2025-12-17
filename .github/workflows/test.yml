@@ -1,0 +1,55 @@
+name: Renode CI
+
+on:
+  workflow_dispatch:
+    
+jobs:
+  renode-test:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+    
+    - name: Install Renode dependencies
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y mono-complete screen policykit-1
+    
+    - name: Download and install Renode
+      run: |
+        wget https://github.com/renode/renode/releases/download/v1.16.0/renode-1.16.0.linux-portable.tar.gz
+        tar -xzf renode-1.16.0.linux-portable.tar.gz
+        echo "${{ github.workspace }}/renode_1.16.0_portable" >> $GITHUB_PATH
+    
+    - name: Install Python dependencies for Renode tests
+      run: |
+        pip install -r renode_1.16.0_portable/tests/requirements.txt
+    
+    - name: Verify Renode installation
+      run: |
+        renode --version
+    
+    - name: Run Renode tests
+      run: |
+        renode --disable-xwt --console \
+          --execute "include @tests/example.resc; start; quit"
+    
+    - name: Run Renode robot tests
+      run: |
+        #export RENODEKEYWORDS=${{ github.workspace }}/renode_1.16.0_portable/tests/renode-keywords.robot
+        
+        renode-test tests/example_basic.robot
+      continue-on-error: false
+    
+    - name: Upload test results
+      if: always()
+      uses: actions/upload-artifact@v4
+      with:
+        name: renode-test-results
+        path: |
+          tests/robot_output.xml
+          tests/log.html
+          tests/report.html
+        if-no-files-found: ignore
+        retention-days: 7
